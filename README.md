@@ -10,7 +10,7 @@ Trabalho de Conclusão de Curso da Especialização em Inteligência Artificial 
 
 O TCC foi desenvolvido no formato de uma competição no Kaggle (**Competição TCC IA 2025**), com dados anonimizados de uma seguradora de veículos. A tarefa é treinar um modelo que estime o risco de acidente: para cada condutor em uma janela de tempo, prever a probabilidade de ocorrer um acidente na janela seguinte.
 
-É um problema de classificação binária bastante desbalanceado (acidentes são cerca de 1,5% dos registros), avaliado pela **área sob a curva ROC (AUC)**, métrica oficial da competição.
+É um problema de classificação binária bastante desbalanceado (5.490 acidentes em 368.734 registros de treino, cerca de 1,5%), avaliado pela **área sob a curva ROC (AUC)**, métrica oficial da competição.
 
 ## Dados
 
@@ -36,12 +36,12 @@ A competição fornece três arquivos, que **não estão neste repositório**:
 
 Foram comparados três algoritmos: **Regressão Logística**, **Random Forest** e **XGBoost**.
 
-1. **Comparação inicial** dos três modelos com hiperparâmetros padrão, combinados com diferentes técnicas de balanceamento de classes: sem balanceamento, Random UnderSampling, Random OverSampling e SMOTE (biblioteca `imbalanced-learn`), além da ponderação de classes.
-2. **Otimização de hiperparâmetros** com `RandomizedSearchCV`, validação cruzada estratificada em 3 folds e AUC ROC como critério.
-3. **Segunda rodada de otimização** do XGBoost, com intervalos de busca ampliados e ajuste fino, executada em GPU.
-4. **Treino final** dos três modelos com os melhores hiperparâmetros e geração da submissão.
+1. **Comparação inicial** ([teste-modelos.ipynb](teste-modelos.ipynb)): os três modelos com hiperparâmetros básicos, combinados com quatro estratégias de balanceamento de classes (sem balanceamento, Random UnderSampling, Random OverSampling e SMOTE, da biblioteca `imbalanced-learn`), avaliados com validação cruzada estratificada em 5 folds.
+2. **Primeira busca de hiperparâmetros** ([teste-modelos.ipynb](teste-modelos.ipynb)): `GridSearchCV` no XGBoost com uma grade enxuta (48 combinações, 3 folds) e PCA com 70 componentes.
+3. **Otimização dos três modelos** com `RandomizedSearchCV`, validação cruzada estratificada em 3 folds e AUC ROC como critério, seguida de uma segunda rodada de ajuste fino do XGBoost em GPU, com intervalos de busca ampliados.
+4. **Treino final** ([treino-otimizado.ipynb](treino-otimizado.ipynb)): os três modelos com os melhores hiperparâmetros encontrados e geração da submissão.
 
-Todos os modelos usam o mesmo pipeline:
+Os modelos finais usam o mesmo pipeline:
 
 - `SimpleImputer(strategy='median')` para valores faltantes
 - `StandardScaler` para padronização
@@ -51,15 +51,28 @@ Todos os modelos usam o mesmo pipeline:
 
 ### Efeito do balanceamento
 
-Sem balanceamento, os modelos atingem acurácia próxima de 0,98 com recall e F1 próximos de zero: preveem quase tudo como "não acidente". Na Regressão Logística, por exemplo:
+Resultados da comparação inicial em [teste-modelos.ipynb](teste-modelos.ipynb), ordenados por AUC (validação cruzada estratificada em 5 folds):
 
-| Balanceamento | AUC | Acurácia | Recall |
-|---|---|---|---|
-| Nenhum | 0,6679 | 0,9851 | 0,0003 |
-| RandomOverSampler | 0,6673 | 0,6621 | 0,5836 |
-| RandomUnderSampler | 0,6647 | 0,6479 | 0,5953 |
+| Modelo | Balanceamento | AUC | Acurácia | Precisão | Recall | F1 |
+|---|---|---|---|---|---|---|
+| Regressão Logística | Nenhum | 0,6639 | 0,9850 | 0,1515 | 0,0009 | 0,0018 |
+| Regressão Logística | RandomOverSampler | 0,6632 | 0,6552 | 0,0251 | 0,5852 | 0,0481 |
+| Regressão Logística | RandomUnderSampler | 0,6577 | 0,6422 | 0,0243 | 0,5883 | 0,0467 |
+| XGBoost | Nenhum* | 0,6570 | 0,7888 | 0,0305 | 0,4277 | 0,0569 |
+| Regressão Logística | SMOTE | 0,6545 | 0,6353 | 0,0239 | 0,5898 | 0,0459 |
+| Random Forest | RandomUnderSampler | 0,6389 | 0,6561 | 0,0233 | 0,5397 | 0,0446 |
+| Random Forest | Nenhum | 0,6332 | 0,9851 | 0,0000 | 0,0000 | 0,0000 |
+| Random Forest | RandomOverSampler | 0,6330 | 0,8950 | 0,0348 | 0,2262 | 0,0603 |
+| XGBoost | RandomUnderSampler* | 0,6202 | 0,0261 | 0,0150 | 0,9944 | 0,0295 |
+| XGBoost | SMOTE* | 0,5885 | 0,3473 | 0,0171 | 0,7576 | 0,0334 |
+| XGBoost | RandomOverSampler* | 0,5711 | 0,0658 | 0,0150 | 0,9546 | 0,0295 |
+| Random Forest | SMOTE | 0,5672 | 0,9143 | 0,0236 | 0,1175 | 0,0392 |
 
-O balanceamento reduz a acurácia para níveis realistas e faz o modelo passar a identificar os casos de acidente, com AUC praticamente inalterada. Por isso a acurácia não serve como métrica neste problema, e a AUC foi usada em todas as comparações. A tabela completa, com os três modelos, está no artigo.
+\* O XGBoost usa ponderação de classes (`scale_pos_weight` ≈ 66) em todas as execuções. O peso é definido na execução sem reamostragem e permanece ativo nas seguintes, de modo que as linhas com reamostragem acumulam os dois ajustes.
+
+Sem balanceamento, Regressão Logística e Random Forest atingem acurácia de 0,985 com recall praticamente zero: preveem quase tudo como "não acidente". Com reamostragem, a acurácia cai para níveis realistas e os modelos passam a identificar os casos de acidente, enquanto a AUC muda pouco. Por isso a acurácia não serve como métrica neste problema, e a AUC foi usada em todas as comparações.
+
+A primeira busca em grade no XGBoost, com PCA de 70 componentes, chegou a apenas 0,6292 de AUC na validação. Nas buscas seguintes o PCA passou a ser opcional e acabou descartado nos três modelos.
 
 ### Modelos otimizados
 
@@ -81,27 +94,31 @@ A configuração vencedora do XGBoost combina árvores rasas (`max_depth=3`), ta
 
 | Arquivo | Descrição |
 |---|---|
-| [notebook7b238902e8.ipynb](notebook7b238902e8.ipynb) | Notebook de treinamento otimizado: treina os três modelos com os melhores hiperparâmetros, mede a AUC na validação e gera o `submission.csv` |
+| [teste-modelos.ipynb](teste-modelos.ipynb) | Notebook de teste e comparação de modelos: compara os três algoritmos com quatro estratégias de balanceamento e faz a primeira busca em grade do XGBoost, com matriz de confusão |
+| [treino-otimizado.ipynb](treino-otimizado.ipynb) | Notebook de treinamento otimizado: treina os três modelos com os melhores hiperparâmetros, mede a AUC na validação e gera o `submission.csv` |
 | [TCC Ciência de Dados.pdf](TCC%20Ci%C3%AAncia%20de%20Dados.pdf) | Artigo do TCC |
 | [auc.png](auc.png) | Curva ROC dos três modelos |
 
 ## Como executar
 
-O notebook foi escrito para rodar no Kaggle, lendo os dados de `/kaggle/input/competicao-tcc-ia-2025/`.
+Os notebooks foram escritos para rodar no Kaggle, lendo os dados de `/kaggle/input/competicao-tcc-ia-2025/`.
 
 1. Abra o notebook no Kaggle e adicione os dados da competição como input.
-2. Ative a GPU: o XGBoost está configurado com `device='cuda'`.
+2. Ative a GPU: o XGBoost está configurado para ela nos dois notebooks.
 3. Execute todas as células.
 
-Para rodar localmente, ajuste os caminhos dos CSVs e, se não houver GPU, troque `device='cuda'` por `device='cpu'`. Dependências:
+Para rodar localmente, ajuste os caminhos dos CSVs. Sem GPU, troque `device='cuda'` por `device='cpu'` em [treino-otimizado.ipynb](treino-otimizado.ipynb) e `tree_method='gpu_hist'` por `tree_method='hist'` (removendo o `predictor`) em [teste-modelos.ipynb](teste-modelos.ipynb). Dependências:
 
 ```bash
-pip install numpy pandas scikit-learn xgboost joblib
+pip install numpy pandas scikit-learn imbalanced-learn xgboost joblib matplotlib seaborn
 ```
 
-A execução salva os três modelos treinados (`modelo_randomforest.pkl`, `modelo_logistic.pkl`, `modelo_xgboost.pkl`) e o arquivo `submission.csv`, com a probabilidade de acidente para cada `id` da base de teste.
+Arquivos gerados:
 
-> **Nota:** a versão do notebook neste repositório calcula o `scale_pos_weight` do XGBoost pela proporção entre as classes, o que resulta em AUC de 0,6864 na validação. O valor de 0,6924 reportado no artigo e no gráfico corresponde a `scale_pos_weight=1`. Além disso, o `submission.csv` gerado por esta versão é a média das probabilidades da Regressão Logística e do XGBoost.
+- [teste-modelos.ipynb](teste-modelos.ipynb): `resultados_modelos_balanceamento.csv`, com as métricas de cada combinação de modelo e balanceamento, e `melhores_resultados.csv`, com o resultado da busca em grade.
+- [treino-otimizado.ipynb](treino-otimizado.ipynb): os três modelos treinados (`modelo_randomforest.pkl`, `modelo_logistic.pkl`, `modelo_xgboost.pkl`) e o `submission.csv`, com a probabilidade de acidente para cada `id` da base de teste.
+
+> **Nota:** a versão de [treino-otimizado.ipynb](treino-otimizado.ipynb) neste repositório calcula o `scale_pos_weight` do XGBoost pela proporção entre as classes, o que resulta em AUC de 0,6864 na validação. O valor de 0,6924 reportado no artigo e no gráfico corresponde a `scale_pos_weight=1`. Além disso, o `submission.csv` gerado por esta versão é a média das probabilidades da Regressão Logística e do XGBoost.
 
 ## Limitações e trabalhos futuros
 
