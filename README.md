@@ -95,7 +95,7 @@ A configuração vencedora do XGBoost combina árvores rasas (`max_depth=3`), ta
 | Arquivo | Descrição |
 |---|---|
 | [teste-modelos.ipynb](teste-modelos.ipynb) | Notebook de teste e comparação de modelos: compara os três algoritmos com quatro estratégias de balanceamento e faz a primeira busca em grade do XGBoost, com matriz de confusão |
-| [treino-otimizado.ipynb](treino-otimizado.ipynb) | Notebook de treinamento otimizado: treina os três modelos com os melhores hiperparâmetros, mede a AUC na validação e gera o `submission.csv` |
+| [treino-otimizado.ipynb](treino-otimizado.ipynb) | Notebook de treinamento otimizado: treina os três modelos com os melhores hiperparâmetros, mede a AUC de cada um na validação e gera o `submission.csv` com a média da Regressão Logística e do XGBoost |
 | [TCC Ciência de Dados.pdf](TCC%20Ci%C3%AAncia%20de%20Dados.pdf) | Artigo do TCC |
 | [auc.png](auc.png) | Curva ROC dos três modelos |
 
@@ -118,13 +118,15 @@ Arquivos gerados:
 - [teste-modelos.ipynb](teste-modelos.ipynb): `resultados_modelos_balanceamento.csv`, com as métricas de cada combinação de modelo e balanceamento, e `melhores_resultados.csv`, com o resultado da busca em grade.
 - [treino-otimizado.ipynb](treino-otimizado.ipynb): os três modelos treinados (`modelo_randomforest.pkl`, `modelo_logistic.pkl`, `modelo_xgboost.pkl`) e o `submission.csv`, com a probabilidade de acidente para cada `id` da base de teste.
 
-> **Nota:** a versão de [treino-otimizado.ipynb](treino-otimizado.ipynb) neste repositório calcula o `scale_pos_weight` do XGBoost pela proporção entre as classes, o que resulta em AUC de 0,6864 na validação. O valor de 0,6924 reportado no artigo e no gráfico corresponde a `scale_pos_weight=1`. Além disso, o `submission.csv` gerado por esta versão é a média das probabilidades da Regressão Logística e do XGBoost.
+> **Nota:** a versão de [treino-otimizado.ipynb](treino-otimizado.ipynb) neste repositório calcula o `scale_pos_weight` do XGBoost pela proporção entre as classes, o que resulta em AUC de 0,6864 na validação. O valor de 0,6924 reportado no artigo e no gráfico corresponde a `scale_pos_weight=1`.
+
+O `submission.csv` gerado é a média simples das probabilidades da Regressão Logística e do XGBoost; o Random Forest fica de fora por ter AUC bem inferior. A AUC dessa média não foi medida na validação.
 
 ## Limitações e trabalhos futuros
 
 - Os recursos computacionais limitaram a extensão da busca de hiperparâmetros e a variedade de modelos testados.
 - Como as variáveis são anonimizadas, não foi possível fazer engenharia de atributos orientada pelo domínio.
-- Próximos passos possíveis: buscas de hiperparâmetros mais amplas, outros algoritmos de boosting e estratégias de ensemble.
+- Próximos passos possíveis: buscas de hiperparâmetros mais amplas, outros algoritmos de boosting e validação do ensemble antes da submissão.
 
 ## Referências
 
